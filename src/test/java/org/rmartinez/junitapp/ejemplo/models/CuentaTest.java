@@ -1,29 +1,58 @@
 package org.rmartinez.junitapp.ejemplo.models;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.*;
 import org.rmartinez.junitapp.ejemplo.exceptions.DineroInsuficienteException;
 
 import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CuentaTest {
 
+    Cuenta cuenta;
+
+    @BeforeEach
+    void initMetodoTest()
+    {
+        this.cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+
+        System.out.println("Iniciando el método de prueba.");
+
+    }
+
+    @AfterEach
+    void tearDown() {
+        System.out.println("Finalizando el metodo de prueba.");
+    }
+
+    @BeforeAll
+    static void beforeAll() {
+        System.out.println("Inicializando el test");
+    }
+
+    @AfterAll
+    static void afterAll() {
+        System.out.println("Finalizando el test");
+    }
+
     @Test
+    @DisplayName("Prueba del nombre de la cuenta")
     void test_nombre_cuenta() {
-        Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+        //Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
         //cuenta.setPersona("Rocio");
         String esperado = "Rocio";
         String real = cuenta.getPersona();
-        assertNotNull(real);
-        assertEquals(esperado, real); //Es mejor usar assertEquals que assertTrue
-        assertTrue(real.equals("Rocio"));
+        assertNotNull(real, () -> "La cuenta no puede ser nula");
+        assertEquals(esperado, real, () -> "El nombre de la cuenta no es el esperado: se esperaba " + esperado + " y fue " + real); //Es mejor usar assertEquals que assertTrue
+        assertTrue(real.equals("Rocio"), () ->"Nombre cuenta esperada debe ser igual a la real");
     }
 
     @Test
     void test_saldo_cuenta() {
-        Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+        //cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
         assertNotNull(cuenta.getSaldo());
         assertEquals(1000.12345, cuenta.getSaldo().doubleValue());
         assertFalse(cuenta.getSaldo().compareTo(BigDecimal.ZERO) < 0);
@@ -31,8 +60,9 @@ class CuentaTest {
     }
 
     @Test
+    @DisplayName("Probando referencias que sean iguales con método equals")
     void testReferenciaCuenta() {
-        Cuenta cuenta = new Cuenta("Dafne", new BigDecimal("1000.741"));
+        cuenta = new Cuenta("Dafne", new BigDecimal("1000.741"));
         Cuenta cuenta2 = new Cuenta("Dafne", new BigDecimal("1000.741"));
 
         //assertNotEquals(cuenta2, cuenta);
@@ -43,7 +73,7 @@ class CuentaTest {
 
     @Test
     void testDebitoCuenta() {
-        Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+        //cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
         cuenta.debito(new BigDecimal(100));
         assertNotNull(cuenta.getSaldo());
         assertEquals(900, cuenta.getSaldo().intValue());
@@ -52,7 +82,7 @@ class CuentaTest {
 
     @Test
     void testCreditoCuenta() {
-        Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+        //cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
         cuenta.credito(new BigDecimal(100));
         assertNotNull(cuenta.getSaldo());
         assertEquals(1100, cuenta.getSaldo().intValue());
@@ -61,7 +91,7 @@ class CuentaTest {
 
     @Test
     void testDineroInsuficienteExceptionCuenta() {
-        Cuenta cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
+        //cuenta = new Cuenta("Rocio", new BigDecimal("1000.12345"));
         Exception exception = assertThrows(DineroInsuficienteException.class, ()-> {
             cuenta.debito(new BigDecimal(1500));
         });
@@ -84,7 +114,10 @@ class CuentaTest {
     }
 
     @Test
+    //@Disabled //para ignorar un test que está fallando
+    @DisplayName("probando relaciones entre cuentas y banco con assertAll")
     void testRelacionBancoCuentas() {
+        //fail() //para hacer que falle el test
         Cuenta cuenta1 = new Cuenta("Rocio", new BigDecimal("2500"));
         Cuenta cuenta2 = new Cuenta("Dafne", new BigDecimal("1500.8989"));
 
@@ -94,17 +127,93 @@ class CuentaTest {
         banco.setNombre("BNA");
         banco.transferir(cuenta2, cuenta1, new BigDecimal(500));
 
-        assertEquals("1000.8989", cuenta2.getSaldo().toPlainString());
-        assertEquals("3000", cuenta1.getSaldo().toPlainString());
+        assertAll(() -> {
+                    assertEquals("1000.8989", cuenta2.getSaldo().toPlainString(), () -> "Valor inesperado cuenta2");
+                },
+                () -> {
+                    assertEquals("3000", cuenta1.getSaldo().toPlainString(), () -> "Valor inesperado de la cuenta1");
+                },
+                () -> {
+                    assertEquals(2, banco.getCuentas().size(), () ->"El banco no tiene las cuentas esperadas");
+                },
+                () -> {
+                    assertEquals("BNA", cuenta1.getBanco().getNombre(), () -> "Nombre del banco inadecuado");
+                },
+                () -> {
+                    assertEquals("Rocio", banco.getCuentas().stream().filter
+                                    (c -> c.getPersona().equals("Rocio")).
+                            findFirst().get().getPersona());
+                },
+                () -> {
+                    assertTrue(banco.getCuentas().stream().
+                            anyMatch(c -> c.getPersona().equals("Dafne")));
+                }
+        );
 
-        assertEquals(2, banco.getCuentas().size());
-        assertEquals("BNA", cuenta1.getBanco().getNombre());
-        assertEquals("Rocio", banco.getCuentas().stream().filter
+        //assertEquals("1000.8989", cuenta2.getSaldo().toPlainString());
+        //assertEquals("3000", cuenta1.getSaldo().toPlainString());
+        //assertEquals(2, banco.getCuentas().size());
+        //assertEquals("BNA", cuenta1.getBanco().getNombre());
+        /*assertEquals("Rocio", banco.getCuentas().stream().filter
                 (c -> c.getPersona().equals("Rocio")).
-                findFirst().get().getPersona());
-
-        assertTrue(banco.getCuentas().stream().
-                anyMatch(c -> c.getPersona().equals("Dafne")));
+                findFirst().get().getPersona());*/
+        /*assertTrue(banco.getCuentas().stream().
+                anyMatch(c -> c.getPersona().equals("Dafne")));*/
     }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void soloWindows() {
+    }
+
+    //Se deahabilita para windows y pasa el test igual
+    @Test
+    @EnabledOnOs({OS.MAC, OS.LINUX})
+    void soloMacLinux() {
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void testNoWindows() {
+    }
+
+    @Test
+    @EnabledOnJre(JRE.JAVA_8)
+    void soloJdk8() {
+    }
+
+    @Test
+    @EnabledOnJre(JRE.JAVA_19)
+    void soloJdk19() {
+    }
+
+    @Test
+    @DisabledOnJre(JRE.JAVA_19)
+    void noJdk19() {
+    }
+
+    @Test
+    void imprimirSystemProperties() {
+        Properties properties = System.getProperties();
+        properties.forEach((k, v)-> System.out.println(k + " : " + v));
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "java.version", matches = "19")
+    void testJavaVersion() {
+    }
+
+    @Test
+    void imprimirVariablesDeAmbiente() {
+        Map<String, String> getenv = System.getenv();
+        getenv.forEach((k, v)-> System.out.println(k + " = " + v));
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "NUMBER_OF_PROCESSORS", matches = "16")
+    void testProcesadores() {
+    }
+
+    
 
 }
